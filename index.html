@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Amazon S3 Multi-file/folder uploader</title>
+	<style type="text/css">
+	body {
+		font-family: Verdana, sans-serif;
+		color: #999;
+		font-size: 32px;
+		margin: 100px auto;
+		width: 620px;
+	}
+	#drop-target {
+		border: 10px dashed #666;
+		transition: border-color 1s;
+		text-align: center;
+		width: 600px;
+		height: 300px;
+		line-height: 300px;
+	}
+	#drop-target.dragenter {
+		border-color: #A6DE2A;
+	}
+	#drop-target.dragdefault {
+		border-color: #666;
+	}
+	#drop-target.dragerror {
+		border-color: #C8120B;
+	}
+	</style>
+</head>
+<body>
+	<div id="drop-target" class="dragdefault">Drop folders</div>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script>
+	$(function() {
+		"use strict";
+
+		var dragDrop = $("#drop-target");
+
+		function uploadFile(file, fileName) {
+			console.log("Uploading file:", fileName);
+			
+			var fd = new FormData();
+			fd.append("key", fileName);
+			fd.append('acl', 'public-read');
+			fd.append("Content-Type", file.type);
+			fd.append("AWSAccessKeyId", "PUBLIC_KEY");
+			fd.append("policy", "POLICY")
+			fd.append("signature", "SIGNATURE");
+			fd.append("file", file);
+
+			var xhr = new XMLHttpRequest();
+			xhr.open("POST", "https://bucket.s3.amazonaws.com/", true);
+			xhr.send(fd);
+		}
+
+		// From https://gist.github.com/tiff/3076863#file-folder_drag_and_drop-js
+		function traverseFileTree(item, path) {
+			path = path || "";
+			if (item.isFile) {
+				// Get file
+				item.file(function(file) {
+					//console.log("File:", path + file.name);
+					uploadFile(file, path + file.name);
+				});
+			} else if (item.isDirectory) {
+				// Get folder contents
+				var dirReader = item.createReader();
+				dirReader.readEntries(function(entries) {
+					for (var i=0; i<entries.length; i++) {
+						traverseFileTree(entries[i], path + item.name + "/");
+					}
+				});
+			}
+		}
+
+		function onDocDragOver(e) {
+			dragDrop.removeClass("dragdefault");
+			dragDrop.addClass("dragerror");
+			return false;
+		}
+
+		function onDocDrop(e) {
+			dragDrop.removeClass("dragerror");
+			dragDrop.removeClass("dragenter");
+			e.stopPropagation();
+			e.preventDefault();
+		}
+
+		function onDragOver(e) {
+			dragDrop.removeClass("dragerror");
+			dragDrop.removeClass("dragdefault");
+			dragDrop.addClass("dragenter");
+			return false;
+		}
+
+		function onDragLeave(e) {
+			dragDrop.removeClass("dragenter");
+			return false;
+		}
+
+		function onDrop(e) {
+			e.preventDefault();
+			
+			var items = event.dataTransfer.items;
+			var l = items.length;
+			for (var i = 0; i < l; i++) {
+				var item = items[i].webkitGetAsEntry();
+				if (item) {
+					traverseFileTree(item);
+				}
+			}
+		}
+
+		dragDrop.on("dragover", onDragOver);
+		dragDrop.on("dragleave", onDragLeave);
+		dragDrop.on("drop", onDrop);
+		$(document).on("dragover", onDocDragOver);
+		$(document).on("dragleave", onDocDrop);
+		$(document).on("drop", onDocDrop);
+	});
+	</script>
+</body>
+</html>
